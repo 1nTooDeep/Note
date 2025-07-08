@@ -45,9 +45,9 @@ gitlab-jenkins/
 在正式启动前，可手动拉取所需镜像以加快后续启动速度：
 
 ```bash
-docker pull gitlab/gitlab-ce:latest
-docker pull jenkins/jenkins:lts
-docker pull gitlab/gitlab-runner:latest  # 可选，用于 GitLab Runner
+docker pull gitlab/gitlab-ce:17.11.5-ce.0
+docker pull jenkins/jenkins:jdk17
+ # 可选，用于 GitLab Runner
 ```
 
 也可跳过此步，直接使用 `docker-compose up` 自动拉取。
@@ -59,37 +59,43 @@ docker pull gitlab/gitlab-runner:latest  # 可选，用于 GitLab Runner
 ```yaml
 version: '3.8'
 
+networks:
+  gitlab_net:
+    driver: bridge
+
 services:
   gitlab:
-    image: gitlab/gitlab-ce:latest
+    image: gitlab/gitlab-ce:17.11.5-ce.0
     container_name: gitlab
-    hostname: gitlab.local
+    hostname: gitlab
     restart: always
     environment:
       GITLAB_OMNIBUS_CONFIG: |
-        external_url 'http://gitlab.local:8929'
-        gitlab_rails['gitlab_shell_ssh_port'] = 2224
+        external_url 'http://gitlab:80'
+        gitlab_rails['gitlab_shell_ssh_port'] = 22
     ports:
+      - '8443:443'
       - '8929:80'
       - '2224:22'
     volumes:
       - ./gitlab/config:/etc/gitlab
       - ./gitlab/logs:/var/log/gitlab
       - ./gitlab/data:/var/opt/gitlab
+    networks:
+      - gitlab_net
 
   jenkins:
-    image: jenkins/jenkins:lts
+    image: jenkins/jenkins:jdk17
     container_name: jenkins
     restart: always
     ports:
       - '8081:8080'
       - '50000:50000'
     volumes:
-      - jenkins_home:/var/jenkins_home
+      - ./jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
-
-volumes:
-  jenkins_home:
+    networks:
+      - gitlab_net
 ```
 
 > **说明**：
@@ -102,6 +108,8 @@ volumes:
 切换到项目根目录，执行：
 
 ```bash
+docker network create gitlab_net
+
 docker-compose up -d
 ```
 

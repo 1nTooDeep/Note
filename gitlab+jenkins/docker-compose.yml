@@ -1,0 +1,40 @@
+version: '3.8'
+
+networks:
+  gitlab_net:
+    driver: bridge
+
+services:
+  gitlab:
+    image: gitlab/gitlab-ce:17.11.5-ce.0
+    container_name: gitlab
+    hostname: gitlab
+    restart: always
+    environment:
+      GITLAB_OMNIBUS_CONFIG: |
+        external_url 'http://gitlab:80'
+        gitlab_rails['gitlab_shell_ssh_port'] = 22
+        gitlab_rails['initial_root_password'] = admin123
+    ports:
+      - '8443:443'
+      - '8929:80'
+      - '2224:22'
+    volumes:
+      - ./gitlab/config:/etc/gitlab
+      - ./gitlab/logs:/var/log/gitlab
+      - ./gitlab/data:/var/opt/gitlab
+    networks:
+      - gitlab_net
+
+  jenkins:
+    image: jenkins/jenkins:jdk17
+    container_name: jenkins
+    restart: always
+    ports:
+      - '8081:8080'
+      - '50000:50000'
+    volumes:
+      - ./jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - gitlab_net
