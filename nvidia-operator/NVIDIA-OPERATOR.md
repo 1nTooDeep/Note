@@ -46,8 +46,12 @@ helm install nvidia-operator nvidia/gpu-operator \
 ##### 3.1 驱动安装与验证
 
 - **默认模式**（`driver.enabled=true`）：
-  - 部署 `nvidia-driver-daemonset`，在每个带 GPU 节点上安装或验证驱动
-  - 若节点已有兼容驱动，仅执行版本/内核兼容性检查
+  1. 部署 `nvidia-driver-daemonset`，在每个带
+     GPU 节点上安装或验证驱动（如果节点不安装驱动
+     也是可以的，另外可以在`values.yaml`中设置驱
+     动版本，驱动版本和`gpu-operator`的支持可以
+     从[官网](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/platform-support.html)中找到）
+  2. 若节点已有兼容驱动，仅执行版本/内核兼容性检查
 - **预装模式**（`driver.enabled=false`）：
   - 跳过驱动安装，仅部署轻量验证容器，确认驱动可用
 
@@ -55,25 +59,35 @@ helm install nvidia-operator nvidia/gpu-operator \
 
 - 部署 `nvidia-container-toolkit-daemonset`
 
-- 在每个 GPU 节点上执行（以 containerd 为例）：
+- 在每个 GPU 节点上执行：
+  - containerd：
+    1. 生成或修改 `/etc/containerd/config.toml`，注入 NVIDIA runtime：
 
-  1. 生成或修改 `/etc/containerd/config.toml`，注入 NVIDIA runtime：
+       ```toml
+       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
+         runtime_type = "io.containerd.runc.v2"
+         privileged_without_host_devices = false
+         [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
+           BinaryName = "/usr/bin/nvidia-container-runtime"
+       ```
 
-     ```toml
-     [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia]
-       runtime_type = "io.containerd.runc.v2"
-       privileged_without_host_devices = false
-       [plugins."io.containerd.grpc.v1.cri".containerd.runtimes.nvidia.options]
-         BinaryName = "/usr/bin/nvidia-container-runtime"
-     ```
+    2. 重启 containerd：
 
-  2. 重启 containerd：
-
-     ```bash
-     systemctl restart containerd
-     ```
-
-- 若使用 Docker，则修改 `/etc/docker/daemon.json` 加入 `"default-runtime": "nvidia"`，并重启 Docker
+       ```bash
+       systemctl restart containerd
+       ```
+  - docker：
+    1. 配置docker `/etc/docker/daemon.json`,
+       加入 `"runtimes": {"nvidia": {"path": "/usr/bin/nvidia-container-runtime"}}`
+       或者使用`nvidia-ctk`进行配置:
+       ```bash
+       nvidia-ctk runtime configure --runtime=docker
+       ```
+    2. 修改后，最好重启docker:
+       ```bash
+       systemctl daemon-reload
+       systemctl restart docker
+       ```
 
 ##### 3.3 Device Plugin 注册
 
@@ -114,7 +128,12 @@ helm install nvidia-operator nvidia/gpu-operator \
 - **驱动安装失败**：查看 `nvidia-driver-daemonset` Pod 日志
 - **运行时无效**：通过 `journalctl -u containerd` 或 `docker logs` 检查
 - **权限/污点问题**：确保 Pod 有正确的 tolerations 与相应的 RBAC 权限
+- **toolkit validator 容器未就绪或者启动失败**：检查系统内核GLIBC版本
+  ：`strings |grep GLIBC`, 如果小于2.27，请升级内核或者使用其他运行时
+- **`nvidia-smi`: not found in $PATH**: 出现这个问题一般是容器运行时配置
+  错误，请检查`/etc/docker/daemon.json`，默认的runtime是否是`nvidia`
 
+------------------
 ```bash
 kubectl get pods -n gpu-operator
 kubectl describe pod <pod-name> -n gpu-operator
