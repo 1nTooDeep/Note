@@ -31,6 +31,8 @@
 
   项目地址：👉 [awesome-operators](https://github.com/operator-framework/awesome-operators)
 
+---
+
 ### **postgres-operator**
 
   描述：这个 Operator 是用来在 Kubernetes 上创建和管理 PostgreSQL 集群的。
@@ -40,6 +42,8 @@
   无需直接操作 Kubernetes API。
 
   项目地址：👉 [postgres-operator](https://github.com/zalando/postgres-operator)
+
+---
 
 ### **istio**
 
